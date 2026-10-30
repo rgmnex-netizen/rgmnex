@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Видео тест</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #111111;
+            color: #dddddd;
+            font-family: Arial, sans-serif;
+        }
+
+        .top-bar {
+            flex-shrink: 0;
+            padding: 6px 10px;
+            background: #1c1c1c;
+            border-bottom: 1px solid #333333;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        input[type="file"] {
+            font-size: 12px;
+            color: #cccccc;
+            background: #262626;
+            border: 1px solid #3a3a3a;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        input[type="number"] {
+            width: 70px;
+            font-size: 13px;
+            color: #eeeeee;
+            background: #262626;
+            border: 1px solid #3a3a3a;
+            padding: 3px 6px;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        button {
+            font-size: 13px;
+            color: #dddddd;
+            background: #2b2b2b;
+            border: 1px solid #444444;
+            padding: 3px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #383838;
+        }
+
+        #videoGrid {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            min-width: 0;
+            display: grid;
+            overflow: hidden;
+            background: #000000;
+        }
+
+        .video-cell {
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000000;
+        }
+
+        .video-cell video {
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+            object-fit: cover;
+            display: block;
+        }
+
+        #overlays-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .overlay-item {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            width: 300px;
+            height: 300px;
+            pointer-events: auto;
+            resize: none;
+            overflow: hidden;
+            border: 2px solid transparent;
+            box-sizing: border-box;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .overlay-item.active {
+            resize: both;
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+        }
+
+        .overlay-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none; /* Чтобы не мешать перетаскиванию самого блока */
+        }
+
+        .overlay-delete {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            border: none;
+            cursor: pointer;
+            width: 24px;
+            height: 24px;
+            font-size: 16px;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+        }
+
+        .overlay-item.active .overlay-delete {
+            display: flex;
+        }
+
+        .overlay-delete:hover {
+            background: rgba(255, 0, 0, 1);
+        }
+
+        #floatingPanel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 20;
+            background: rgba(30, 30, 30, 0.85);
+            border: 1px solid #777777;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #dddddd;
+            font-size: 13px;
+        }
+
+        .volume-control input[type="range"] {
+            width: 100px;
+            cursor: pointer;
+        }
+
+        #stopBtn {
+            font-size: 13px;
+            color: #ffffff;
+            background: rgba(180, 50, 50, 0.8);
+            border: 1px solid #ff7777;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        #stopBtn:hover {
+            background: rgba(220, 50, 50, 1);
+        }
+
+        .hidden-element {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Верхняя панель управления -->
+    <div class="top-bar">
+        <div class="control-group">
+            <label for="videoFile">Выберите видео:</label>
+            <input type="file" id="videoFile" accept="video/*">
+        </div>
+
+        <div class="control-group">
+            <label for="videoCount">Кол-во на экране:</label>
+            <input type="number" id="videoCount" value="8" min="1" max="500">
+        </div>
+
+        <div class="control-group">
+            <label for="imageFile">Картинки (можно неск.):</label>
+            <input type="file" id="imageFile" accept="image/*" multiple>
+        </div>
+
+        <div class="control-group">
+            <label for="volumeMain">Громкость:</label>
+            <input type="range" id="volumeMain" min="0" max="100" value="100" style="width: 80px; cursor: pointer;">
+        </div>
+
+        <div class="control-group">
+            <button id="startBtn" type="button">Запустить</button>
+            <button id="resetBtn" type="button">Сброс</button>
+        </div>
+
+        <span id="statusMsg" class="text-red-400 text-xs hidden"></span>
+    </div>
+
+    <!-- Контейнер сетки на весь оставшийся экран без скролла -->
+    <div id="videoGrid"></div>
+    
+    <!-- Контейнер для картинок поверх видео -->
+    <div id="overlays-container"></div>
+
+    <!-- Плавающая панель с кнопкой остановки и громкостью (изначально скрыта) -->
+    <div id="floatingPanel" class="hidden-element">
+        <div class="volume-control">
+            <label for="volumeFloat">🔊</label>
+            <input type="range" id="volumeFloat" min="0" max="100" value="100">
+        </div>
+        <button id="stopBtn">Остановить (Esc)</button>
+    </div>
+
+    <script>
+        const videoFileInput = document.getElementById('videoFile');
+        const videoCountInput = document.getElementById('videoCount');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const videoGrid = document.getElementById('videoGrid');
+        const statusMsg = document.getElementById('statusMsg');
+        const topBar = document.querySelector('.top-bar');
+        const stopBtn = document.getElementById('stopBtn');
+        const imageFileInput = document.getElementById('imageFile');
+        const volumeMain = document.getElementById('volumeMain');
+        const volumeFloat = document.getElementById('volumeFloat');
+        const overlaysContainer = document.getElementById('overlays-container');
+        const floatingPanel = document.getElementById('floatingPanel');
+
+        let currentObjectUrl = null;
+        let activeCount = 0;
+        let globalVolume = 1.0;
+        let videoAspectRatio = 1; // Пропорции видео (по умолчанию 1:1 для кружков/квадратов)
+
+        // --- Логика добавления и перетаскивания картинок ---
+        imageFileInput.addEventListener('change', function(e) {
+            const files = e.target.files;
+            for(let i = 0; i < files.length; i++) {
+                createOverlay(files[i]);
+            }
+            // Сбрасываем input, чтобы можно было загрузить те же файлы еще раз
+            this.value = '';
+        });
+
+        function createOverlay(file) {
+            const url = URL.createObjectURL(file);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'overlay-item';
+            
+            const img = document.createElement('img');
+            img.src = url;
+            
+            const delBtn = document.createElement('button');
+            delBtn.className = 'overlay-delete';
+            delBtn.innerHTML = '×';
+            delBtn.title = 'Удалить картинку';
+            delBtn.onclick = function(e) {
+                e.stopPropagation();
+                wrapper.remove();
+                URL.revokeObjectURL(url);
+            };
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(delBtn);
+            overlaysContainer.appendChild(wrapper);
+
+            // Снимаем выделение со всех остальных и делаем новую картинку активной
+            document.querySelectorAll('.overlay-item').forEach(item => item.classList.remove('active'));
+            wrapper.classList.add('active');
+
+            makeDraggable(wrapper);
+        }
+
+        function makeDraggable(el) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            el.addEventListener('mousedown', function(e) {
+                // Делаем элемент активным
+                document.querySelectorAll('.overlay-item').forEach(item => item.classList.remove('active'));
+                el.classList.add('active');
+
+                // Игнорируем клик по кнопке удаления
+                if (e.target.classList.contains('overlay-delete')) return;
+                
+                // Игнорируем клик по правому нижнему углу (зона изменения размера, ~20x20px)
+                const rect = el.getBoundingClientRect();
+                const isResizeHandle = (e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20);
+                if (isResizeHandle) return;
+
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = el.offsetLeft;
+                initialTop = el.offsetTop;
+                
+                // Выводим активную картинку на передний план
+                document.querySelectorAll('.overlay-item').forEach(item => {
+                    item.style.zIndex = 10;
+                });
+                el.style.zIndex = 100;
+                
+                e.preventDefault(); // Предотвращаем стандартное выделение
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                el.style.left = (initialLeft + dx) + 'px';
+                el.style.top = (initialTop + dy) + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+            });
+        }
+        // ----------------------------------------------------
+
+        function showError(text) {
+            statusMsg.textContent = text;
+            statusMsg.classList.remove('hidden');
+        }
+
+        function hideError() {
+            statusMsg.textContent = '';
+            statusMsg.classList.add('hidden');
+        }
+
+        // Расчет оптимальной сетки (колонки и строки), чтобы все видео поместились целиком и были максимально крупными
+        function updateGridLayout() {
+            if (activeCount <= 0) return;
+
+            const containerWidth = videoGrid.clientWidth || window.innerWidth;
+            const containerHeight = videoGrid.clientHeight || window.innerHeight;
+
+            if (containerWidth === 0 || containerHeight === 0) return;
+
+            let bestCols = 1;
+            let bestRows = activeCount;
+            let maxVideoSize = 0;
+
+            for (let cols = 1; cols <= activeCount; cols++) {
+                const rows = Math.ceil(activeCount / cols);
+                const cellWidth = containerWidth / cols;
+                const cellHeight = containerHeight / rows;
+
+                // Вычисляем реальный размер вписанного видео с учетом его пропорций
+                let fittedWidth = cellWidth;
+                let fittedHeight = cellWidth / videoAspectRatio;
+
+                if (fittedHeight > cellHeight) {
+                    fittedHeight = cellHeight;
+                    fittedWidth = cellHeight * videoAspectRatio;
+                }
+
+                const area = fittedWidth * fittedHeight;
+                if (area > maxVideoSize) {
+                    maxVideoSize = area;
+                    bestCols = cols;
+                    bestRows = rows;
+                }
+            }
+
+            videoGrid.style.gridTemplateColumns = `repeat(${bestCols}, minmax(0, 1fr))`;
+            videoGrid.style.gridTemplateRows = `repeat(${bestRows}, minmax(0, 1fr))`;
+        }
+
+        // Полная остановка видео и очистка сетки
+        function clearVideos() {
+            hideError();
+            activeCount = 0;
+
+            // Возвращаем верхнее меню и прячем плавающую панель
+            topBar.style.display = 'flex';
+            floatingPanel.classList.add('hidden-element');
+
+            const existingVideos = videoGrid.querySelectorAll('video');
+            existingVideos.forEach((video) => {
+                try {
+                    video.pause();
+                    video.removeAttribute('src');
+                    video.load();
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+
+            videoGrid.innerHTML = '';
+            videoGrid.style.gridTemplateColumns = '';
+            videoGrid.style.gridTemplateRows = '';
+
+            if (currentObjectUrl) {
+                URL.revokeObjectURL(currentObjectUrl);
+                currentObjectUrl = null;
+            }
+        }
+
+        // Запуск всех копий видео
+        startBtn.addEventListener('click', function () {
+            const file = videoFileInput.files[0];
+            const count = parseInt(videoCountInput.value, 10);
+
+            if (!file) {
+                showError('Сначала выберите видеофайл.');
+                return;
+            }
+
+            if (isNaN(count) || count < 1) {
+                showError('Введите корректное число (минимум 1).');
+                return;
+            }
+
+            clearVideos();
+
+            // Скрываем верхнее меню и показываем плавающую панель
+            topBar.style.display = 'none';
+            floatingPanel.classList.remove('hidden-element');
+
+            activeCount = count;
+            currentObjectUrl = URL.createObjectURL(file);
+
+            // Предварительно строим сетку
+            updateGridLayout();
+
+            const fragment = document.createDocumentFragment();
+            const videoElements = [];
+
+            for (let i = 0; i < count; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'video-cell';
+
+                const video = document.createElement('video');
+                video.src = currentObjectUrl;
+                video.controls = false;
+                video.loop = true;
+                video.muted = false;
+                video.volume = globalVolume;
+                video.playsInline = true;
+
+                // Как только первое видео загрузит метаданные, уточняем пропорции и пересчитываем сетку
+                if (i === 0) {
+                    video.addEventListener('loadedmetadata', function () {
+                        if (video.videoWidth && video.videoHeight) {
+                            videoAspectRatio = video.videoWidth / video.videoHeight;
+                            updateGridLayout();
+                        }
+                    }, { once: true });
+                }
+
+                cell.appendChild(video);
+                fragment.appendChild(cell);
+                videoElements.push(video);
+            }
+
+            videoGrid.appendChild(fragment);
+
+            videoElements.forEach((video) => {
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch((err) => {
+                        console.warn('Ошибка автозапуска:', err);
+                    });
+                }
+            });
+        });
+
+        resetBtn.addEventListener('click', function () {
+            clearVideos();
+        });
+
+        // Синхронизация и применение громкости
+        function syncVolume(e) {
+            const val = e.target.value;
+            volumeMain.value = val;
+            volumeFloat.value = val;
+            globalVolume = val / 100;
+            
+            const existingVideos = videoGrid.querySelectorAll('video');
+            existingVideos.forEach(v => v.volume = globalVolume);
+        }
+
+        volumeMain.addEventListener('input', syncVolume);
+        volumeFloat.addEventListener('input', syncVolume);
+
+        // Остановка по нажатию на плавающую кнопку
+        stopBtn.addEventListener('click', function () {
+            clearVideos();
+        });
+
+        // Остановка по нажатию на клавишу Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && activeCount > 0) {
+                clearVideos();
+            }
+        });
+
+        // Остановка по двойному клику в любом месте экрана с видео
+        videoGrid.addEventListener('dblclick', function() {
+            if (activeCount > 0) {
+                clearVideos();
+            }
+        });
+
+        // Снятие выделения с картинок при клике по пустому месту
+        document.addEventListener('mousedown', function(e) {
+            if (!e.target.closest('.overlay-item')) {
+                document.querySelectorAll('.overlay-item').forEach(item => item.classList.remove('active'));
+            }
+        });
+
+        // Пересчет сетки при изменении размеров окна
+        window.addEventListener('resize', function () {
+            updateGridLayout();
+        });
+    </script>
+</body>
+</html>
